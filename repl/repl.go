@@ -13,11 +13,12 @@ import (
 
 type Repl struct {
 	Config       config.Config
-	LocalHistory []*genai.GenerateContentResponse
+	LocalHistory []*genai.Content
+	Editor       *readline.Editor
 }
 
 func NewRepl(config config.Config) Repl {
-	return Repl{config, make([]*genai.GenerateContentResponse, 0)}
+	return Repl{Config: config, LocalHistory: make([]*genai.Content, 0)}
 }
 
 func (repl *Repl) StartRepl() {
@@ -28,29 +29,26 @@ func (repl *Repl) StartRepl() {
 			return io.WriteString(w, "> ")
 		},
 		History:        replHistory,
-		HistoryCycling: true,
+		HistoryCycling: false,
 	}
+	repl.Editor = editor
 
 	fmt.Println("Type Ctrl-D or Ctrl-C to quit.")
 	for {
-		text, err := editor.ReadLine(context.Background())
+		line, err := editor.ReadLine(context.Background())
+		line = strings.TrimSpace(line)
 
 		if err != nil {
 			fmt.Printf("ERR=%s\n", err.Error())
 			return
 		}
 
-		line := strings.TrimSpace(text)
 		if len(line) <= 0 {
 			continue
 		}
 
-		ch := make(chan bool)
-		go (func() {
-			ch <- repl.Evaluator(line)
-		})()
-		<-ch
+		repl.Evaluator(line)
 
-		replHistory.Add(text)
+		replHistory.Add(line)
 	}
 }
